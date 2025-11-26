@@ -120,7 +120,7 @@ main {
 
 svg#graph-canvas {
   width: 100%;
-  height: calc(100vh - 220px);
+  height: min(950px, calc(120vh - 220px));
 }
 
 .info-panel {

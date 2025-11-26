@@ -1,7 +1,7 @@
 const SVG_NS = 'http://www.w3.org/2000/svg';
 const DEFAULT_OPTIONS = {
   repulsion: 6500,
-  springLength: 140,
+  springLength: 70,
   springStrength: 0.01,
   damping: 0.9,
 };
@@ -74,6 +74,7 @@ export class GraphRenderer {
       if (!entry?.circle) return;
       if (entry.node.id === nodeId) {
         entry.circle.classList.add('node-active');
+        this.#bringGroupToFront(entry.group);
       } else {
         entry.circle.classList.remove('node-active');
       }
@@ -130,8 +131,13 @@ export class GraphRenderer {
         this.callbacks.onNodeClick(node);
       });
 
-      group.addEventListener('mouseenter', () => group.classList.add('node-hover'));
-      group.addEventListener('mouseleave', () => group.classList.remove('node-hover'));
+      group.addEventListener('mouseenter', () => {
+        group.classList.add('node-hover');
+        this.#bringGroupToFront(group);
+      });
+      group.addEventListener('mouseleave', () => {
+        group.classList.remove('node-hover');
+      });
 
       group.appendChild(circle);
       group.appendChild(label);
@@ -202,7 +208,7 @@ export class GraphRenderer {
     });
 
     // 3) Pull nodes back toward the viewport center and integrate velocity.
-    const padding = 60;
+    const padding = Math.max(90, Math.min(this.width, this.height) * 0.12);
     const maxX = Math.max((this.width ?? 800) - padding, padding);
     const maxY = Math.max((this.height ?? 600) - padding, padding);
 
@@ -307,5 +313,10 @@ export class GraphRenderer {
   #quantize(value, decimals = 5) {
     const factor = 10 ** decimals;
     return Math.round(value * factor) / factor;
+  }
+
+  #bringGroupToFront(group) {
+    if (!group || group.parentNode !== this.nodeLayer) return;
+    this.nodeLayer.appendChild(group);
   }
 }
