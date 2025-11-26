@@ -21,7 +21,6 @@ const dom = {
   seedSubmit: document.querySelector('#seed-form button[type="submit"]'),
   seedSuggestions: document.getElementById('seed-suggestions'),
   infoBody: document.getElementById('info-panel-body'),
-  resetBtn: document.getElementById('clear-graph'),
 };
 
 // Renderer owns the physics simulation and click handling for nodes.
@@ -36,11 +35,6 @@ function bootstrap() {
   dom.seedForm.addEventListener('submit', (event) => {
     event.preventDefault();
     loadSeed(dom.seedInput.value.trim() || DEFAULT_SEED, { includeHosts: true });
-  });
-
-  dom.resetBtn.addEventListener('click', () => {
-    dom.seedInput.value = DEFAULT_SEED;
-    loadSeed(DEFAULT_SEED, { includeHosts: true });
   });
 
   dom.seedInput.addEventListener('input', handleSeedInputChange);
@@ -115,7 +109,6 @@ function normalizeEndpoint(value) {
 function toggleControls(disabled) {
   dom.seedInput.disabled = disabled;
   dom.seedSubmit.disabled = disabled;
-  dom.resetBtn.disabled = disabled;
 }
 
 /** Render a friendly message in the info panel. */
