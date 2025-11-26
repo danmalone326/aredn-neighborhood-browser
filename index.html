@@ -13,15 +13,21 @@
         <p>Explore mesh neighbors starting from a seed node.</p>
       </div>
       <form id="seed-form" class="seed-form" autocomplete="off">
-        <label for="seed-input">Start Node</label>
-        <input
-          type="text"
-          id="seed-input"
-          name="seed"
-          placeholder="localnode.local.mesh"
-          value="localnode.local.mesh"
-          required
-        />
+        <div class="seed-input-wrapper">
+          <label for="seed-input">Start Node</label>
+          <div class="seed-input-field">
+            <input
+              type="text"
+              id="seed-input"
+              name="seed"
+              placeholder="localnode.local.mesh"
+              value="localnode.local.mesh"
+              required
+              autocomplete="off"
+            />
+            <ul id="seed-suggestions" class="seed-suggestions"></ul>
+          </div>
+        </div>
         <button type="submit">Reload Graph</button>
       </form>
     </header>

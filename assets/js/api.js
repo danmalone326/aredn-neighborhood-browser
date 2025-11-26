@@ -17,8 +17,8 @@ export class MeshApi {
    * @param {string} host - hostname or IP of the target node.
    * @returns {Promise<Object>} Parsed JSON payload.
    */
-  async fetchLinkInfo(host) {
-    const url = this.#buildUrl(host);
+  async fetchLinkInfo(host, options = {}) {
+    const url = this.#buildUrl(host, options);
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), this.timeoutMs);
 
@@ -43,10 +43,11 @@ export class MeshApi {
    * @param {string} host
    * @returns {string}
    */
-  #buildUrl(host) {
+  #buildUrl(host, options = {}) {
     const trimmed = host.trim();
     const prefixed = /^https?:\/\//i.test(trimmed) ? trimmed : `http://${trimmed}`;
     const sanitized = prefixed.replace(/\/$/, '');
-    return `${sanitized}/cgi-bin/sysinfo.json?link_info=1`;
+    const base = `${sanitized}/cgi-bin/sysinfo.json?link_info=1`;
+    return options.includeHosts ? `${base}&hosts=1` : base;
   }
 }

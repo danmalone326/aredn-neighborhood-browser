@@ -10,13 +10,16 @@ const DEFAULT_SEED = 'localnode.local.mesh';
 const api = new MeshApi();
 const state = new GraphState();
 const inflightNodes = new Set();
+let hostDirectory = [];
+let seedInputFocused = false;
 
 const dom = {
   status: document.getElementById('graph-status'),
   canvas: document.getElementById('graph-canvas'),
   seedForm: document.getElementById('seed-form'),
   seedInput: document.getElementById('seed-input'),
-  seedSubmit: document.querySelector('#seed-form button[type=\"submit\"]'),
+  seedSubmit: document.querySelector('#seed-form button[type="submit"]'),
+  seedSuggestions: document.getElementById('seed-suggestions'),
   infoBody: document.getElementById('info-panel-body'),
   resetBtn: document.getElementById('clear-graph'),
 };
@@ -32,32 +35,60 @@ bootstrap();
 function bootstrap() {
   dom.seedForm.addEventListener('submit', (event) => {
     event.preventDefault();
-    loadSeed(dom.seedInput.value.trim() || DEFAULT_SEED);
+    loadSeed(dom.seedInput.value.trim() || DEFAULT_SEED, { includeHosts: true });
   });
 
   dom.resetBtn.addEventListener('click', () => {
     dom.seedInput.value = DEFAULT_SEED;
-    loadSeed(DEFAULT_SEED);
+    loadSeed(DEFAULT_SEED, { includeHosts: true });
   });
 
-  loadSeed(DEFAULT_SEED);
+  dom.seedInput.addEventListener('input', handleSeedInputChange);
+  dom.seedInput.addEventListener('focus', () => {
+    seedInputFocused = true;
+    handleSeedInputChange();
+  });
+  dom.seedInput.addEventListener('blur', () => {
+    seedInputFocused = false;
+    hideSeedSuggestions();
+  });
+  dom.seedSuggestions.addEventListener('mousedown', (event) => event.preventDefault());
+  dom.seedSuggestions.addEventListener('click', handleSuggestionClick);
+  document.addEventListener('click', (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLElement)) return;
+    if (
+      target === dom.seedInput ||
+      dom.seedSuggestions.contains(target) ||
+      target.closest('.seed-input-wrapper')
+    ) {
+      return;
+    }
+    hideSeedSuggestions();
+  });
+
+  loadSeed(DEFAULT_SEED, { includeHosts: true });
 }
 
 /**
  * Load a seed host, resetting the graph before populating with new data.
  * @param {string} seedHost
  */
-async function loadSeed(seedHost) {
+async function loadSeed(seedHost, { includeHosts = false } = {}) {
   const target = seedHost || DEFAULT_SEED;
   setStatus(`Loading ${target}...`, 'info');
   dom.seedInput.value = target;
   toggleControls(true);
+  if (includeHosts) {
+    hostDirectory = [];
+    hideSeedSuggestions();
+  }
   state.reset();
   renderer.sync(state.getGraphData());
   renderInfoMessage('Select a node to see details.');
 
   try {
-    const root = await ingestNode(target, 0);
+    const root = await ingestNode(target, 0, { includeHosts });
     renderer.setActiveNode(root?.id);
     handleNodeSelection(root, { expand: false });
   } catch (error) {
@@ -90,6 +121,110 @@ function toggleControls(disabled) {
 /** Render a friendly message in the info panel. */
 function renderInfoMessage(message) {
   dom.infoBody.innerHTML = `<dd>${message}</dd>`;
+}
+
+/** Handle search box typing to show host matches. */
+function handleSeedInputChange() {
+  if (!seedInputFocused) {
+    hideSeedSuggestions();
+    return;
+  }
+  const query = dom.seedInput.value.trim().toLowerCase();
+  if (!query || !hostDirectory.length) {
+    hideSeedSuggestions();
+    return;
+  }
+
+  const matches = hostDirectory
+    .filter((entry) => {
+      const name = entry.name?.toLowerCase() ?? '';
+      const ip = entry.ip ?? '';
+      return name.includes(query) || ip.includes(query);
+    })
+    .slice(0, 8);
+
+  if (!matches.length) {
+    hideSeedSuggestions();
+    return;
+  }
+
+  renderSeedSuggestions(matches);
+}
+
+/** Clear autocomplete dropdown. */
+function hideSeedSuggestions() {
+  dom.seedSuggestions.classList.remove('visible');
+  dom.seedSuggestions.innerHTML = '';
+}
+
+/** Render suggestion list items safely. */
+function renderSeedSuggestions(matches) {
+  dom.seedSuggestions.innerHTML = '';
+  matches.forEach((entry) => {
+    const li = document.createElement('li');
+    li.dataset.hostName = entry.name || '';
+    li.dataset.hostIp = entry.ip || '';
+
+    const nameSpan = document.createElement('span');
+    nameSpan.classList.add('host-name');
+    nameSpan.textContent = entry.name || '(unnamed)';
+
+    const ipSpan = document.createElement('span');
+    ipSpan.classList.add('host-ip');
+    ipSpan.textContent = entry.ip || 'unknown';
+
+    li.appendChild(nameSpan);
+    li.appendChild(ipSpan);
+    dom.seedSuggestions.appendChild(li);
+  });
+  dom.seedSuggestions.classList.add('visible');
+}
+
+/** Respond to suggestion selection. */
+function handleSuggestionClick(event) {
+  const item = event.target.closest('li[data-host-name]');
+  if (!item) return;
+  event.preventDefault();
+  applySeedSuggestion({
+    name: item.dataset.hostName || '',
+    ip: item.dataset.hostIp || '',
+  });
+}
+
+/** Apply a chosen host to the seed input and reload graph. */
+function applySeedSuggestion(host) {
+  const hostname = host.name?.trim();
+  let nextSeed = null;
+  if (hostname) {
+    const trimmed = hostname.endsWith('.local.mesh') ? hostname : `${hostname}.local.mesh`;
+    nextSeed = trimmed;
+  } else if (host.ip) {
+    nextSeed = host.ip;
+  }
+  if (!nextSeed) return;
+
+  dom.seedInput.value = nextSeed;
+  hideSeedSuggestions();
+  loadSeed(nextSeed, { includeHosts: true });
+}
+
+/** Persist host list from the most recent seed node response. */
+function updateHostDirectory(entries = []) {
+  hostDirectory = entries
+    .filter((entry) => {
+      if (!entry || (!entry.name && !entry.ip)) return false;
+      const name = entry.name?.trim().toLowerCase() ?? '';
+      return !name.endsWith('.local.mesh');
+    })
+    .map((entry) => ({
+      name: entry.name?.trim() ?? '',
+      ip: entry.ip?.trim() ?? '',
+    }))
+    .sort((a, b) => {
+      const aLabel = a.name?.toLowerCase() || a.ip;
+      const bLabel = b.name?.toLowerCase() || b.ip;
+      return aLabel.localeCompare(bLabel);
+    });
 }
 
 /**
@@ -131,7 +266,7 @@ function resolveLinkStyleClass(linkType) {
  * @param {number} level
  */
 async function ingestNode(endpoint, level, options = {}) {
-  const { nodeId } = options;
+  const { nodeId, includeHosts = false } = options;
   const normalizedId = normalizeEndpoint(endpoint);
   const lookupId = nodeId ?? normalizedId;
   const existing = state.getNode(lookupId);
@@ -147,7 +282,11 @@ async function ingestNode(endpoint, level, options = {}) {
   inflightNodes.add(normalizedId);
   try {
     setStatus(`Querying ${endpoint}...`, 'info');
-    const payload = await api.fetchLinkInfo(endpoint);
+    const payload = await api.fetchLinkInfo(endpoint, { includeHosts });
+    if (includeHosts) {
+      updateHostDirectory(payload.hosts ?? []);
+      handleSeedInputChange();
+    }
     const record = registerPayload(endpoint, payload, level, { nodeId });
     setStatus(`Loaded ${Object.keys(payload.link_info ?? {}).length} links from ${record.label}`, 'success');
     return record;

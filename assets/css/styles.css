@@ -47,6 +47,19 @@ header p {
   align-items: flex-end;
 }
 
+.seed-input-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  position: relative;
+}
+
+.seed-input-field {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
 .seed-form label {
   font-size: 0.9rem;
   color: var(--muted);
@@ -59,6 +72,50 @@ header p {
   background: #0b1220;
   color: var(--text);
   min-width: 250px;
+}
+
+.seed-suggestions {
+  list-style: none;
+  margin: 0.2rem 0 0;
+  padding: 0;
+  background: #0b1220;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 0.4rem;
+  max-height: 220px;
+  overflow-y: auto;
+  position: absolute;
+  top: calc(100% + 0.25rem);
+  width: 100%;
+  z-index: 10;
+  display: none;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+}
+
+.seed-suggestions.visible {
+  display: block;
+}
+
+.seed-suggestions li {
+  padding: 0.4rem 0.75rem;
+  font-size: 0.9rem;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.seed-suggestions li:hover,
+.seed-suggestions li:focus {
+  background: rgba(56, 189, 248, 0.15);
+}
+
+.seed-suggestions .host-name {
+  font-weight: 600;
+}
+
+.seed-suggestions .host-ip {
+  color: var(--muted);
+  font-size: 0.85rem;
 }
 
 button {
