@@ -1,0 +1,229 @@
+:root {
+  color-scheme: dark;
+  --bg: #0f172a;
+  --panel: #1e293b;
+  --text: #e2e8f0;
+  --muted: #94a3b8;
+  --accent: #38bdf8;
+  --danger: #f87171;
+  --success: #4ade80;
+  --warn: #facc15;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+}
+
+header.app-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 2rem;
+  padding: 1.5rem 2rem;
+  align-items: flex-end;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+header h1 {
+  margin: 0;
+  font-size: 1.8rem;
+}
+
+header p {
+  margin: 0.4rem 0 0;
+  color: var(--muted);
+}
+
+.seed-form {
+  display: flex;
+  gap: 0.75rem;
+  align-items: flex-end;
+}
+
+.seed-form label {
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+
+.seed-form input {
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.35rem;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: #0b1220;
+  color: var(--text);
+  min-width: 250px;
+}
+
+button {
+  padding: 0.6rem 1rem;
+  border-radius: 0.35rem;
+  border: none;
+  background: var(--accent);
+  color: #04121e;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.2s ease;
+}
+
+button.ghost {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: var(--muted);
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+main {
+  display: grid;
+  grid-template-columns: 3fr 1fr;
+  gap: 1rem;
+  padding: 1rem 2rem 2rem;
+  min-height: calc(100vh - 120px);
+}
+
+.graph-panel {
+  position: relative;
+  background: var(--panel);
+  border-radius: 0.75rem;
+  overflow: hidden;
+}
+
+.graph-status {
+  position: absolute;
+  top: 0.75rem;
+  left: 0.75rem;
+  padding: 0.3rem 0.75rem;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  background: rgba(15, 23, 42, 0.7);
+  backdrop-filter: blur(8px);
+}
+.graph-status.status-info {
+  color: var(--accent);
+}
+.graph-status.status-success {
+  color: var(--success);
+}
+.graph-status.status-error {
+  color: var(--danger);
+}
+
+svg#graph-canvas {
+  width: 100%;
+  height: calc(100vh - 220px);
+}
+
+.info-panel {
+  background: var(--panel);
+  border-radius: 0.75rem;
+  padding: 1.25rem;
+}
+
+.info-panel h2 {
+  margin-top: 0;
+}
+
+.info-panel dl {
+  margin: 0;
+}
+
+dl dt {
+  font-weight: 600;
+  margin-top: 0.75rem;
+}
+
+dl dd {
+  margin: 0.15rem 0 0;
+  color: var(--muted);
+}
+
+.link-segment {
+  stroke-width: 2;
+}
+.link-wireguard {
+  stroke: #94a3b8;
+  stroke-dasharray: 6 4;
+}
+.link-dtd {
+  stroke: #94a3b8;
+}
+.link-rf {
+  stroke: var(--success);
+}
+.link-default {
+  stroke: var(--accent);
+}
+
+.node-group {
+  cursor: pointer;
+}
+
+.node-label {
+  font-size: 0.8rem;
+  pointer-events: none;
+  fill: var(--muted);
+  transition: fill 0.15s ease;
+  stroke: none;
+  paint-order: normal;
+}
+.node-group.node-hover .node-label,
+.node-group .node-label.highlighted {
+  fill: var(--text);
+  font-weight: 600;
+  stroke: rgba(15, 23, 42, 0.9);
+  stroke-width: 6px;
+  stroke-linejoin: round;
+  paint-order: stroke fill;
+}
+
+.node-root {
+  fill: #f8fafc;
+  stroke: var(--accent);
+  stroke-width: 2px;
+}
+
+.node-peer {
+  fill: var(--warn);
+  stroke: rgba(0, 0, 0, 0.25);
+  stroke-width: 1px;
+}
+
+.node-active {
+  stroke: var(--accent);
+  stroke-width: 3px;
+}
+
+.tooltip {
+  position: absolute;
+  padding: 0.5rem 0.75rem;
+  background: rgba(15, 23, 42, 0.92);
+  border-radius: 0.4rem;
+  pointer-events: none;
+  font-size: 0.85rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+@media (max-width: 960px) {
+  main {
+    grid-template-columns: 1fr;
+  }
+
+  header.app-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  svg#graph-canvas {
+    height: 60vh;
+  }
+}
