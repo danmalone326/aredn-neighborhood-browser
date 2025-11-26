@@ -206,11 +206,11 @@ function updateHostDirectory(entries = []) {
   hostDirectory = entries
     .filter((entry) => {
       if (!entry || (!entry.name && !entry.ip)) return false;
-      const name = entry.name?.trim().toLowerCase() ?? '';
+      const name = sanitizeHostname(entry.name)?.toLowerCase() ?? '';
       return !name.endsWith('.local.mesh');
     })
     .map((entry) => ({
-      name: entry.name?.trim() ?? '',
+      name: sanitizeHostname(entry.name),
       ip: entry.ip?.trim() ?? '',
     }))
     .sort((a, b) => {
@@ -231,6 +231,13 @@ function resolveHostnameEndpoint(hostname) {
   const trimmed = hostname.trim().toLowerCase();
   if (!trimmed) return null;
   return trimmed.endsWith('.local.mesh') ? trimmed : `${trimmed}.local.mesh`;
+}
+
+/** Removes extra diagnostic text (e.g., PTR record) that may trail hostnames. */
+function sanitizeHostname(value) {
+  if (!value) return '';
+  const [firstLine] = value.split(/\r?\n/);
+  return firstLine.trim();
 }
 
 /**
@@ -275,6 +282,12 @@ async function ingestNode(endpoint, level, options = {}) {
   }
 
   inflightNodes.add(normalizedId);
+  const pendingNode = state.getNode(lookupId);
+  if (pendingNode) {
+    pendingNode.loading = true;
+    pendingNode.failed = false;
+    renderer.sync(state.getGraphData());
+  }
   try {
     setStatus(`Querying ${endpoint}...`, 'info');
     const payload = await api.fetchLinkInfo(endpoint, { includeHosts });
@@ -289,12 +302,17 @@ async function ingestNode(endpoint, level, options = {}) {
     setStatus(`Failed to reach ${endpoint}: ${error.message}`, 'error');
     const targetNode = state.getNode(lookupId);
     if (targetNode) {
+      targetNode.loading = false;
       targetNode.failed = true;
+      renderer.sync(state.getGraphData());
     }
-    renderer.sync(state.getGraphData());
     throw error;
   } finally {
     inflightNodes.delete(normalizedId);
+    const targetNode = state.getNode(lookupId);
+    if (targetNode && !targetNode.failed) {
+      targetNode.loading = false;
+    }
   }
 }
 
@@ -306,10 +324,11 @@ async function ingestNode(endpoint, level, options = {}) {
  */
 function registerPayload(endpoint, payload, level, options = {}) {
   const requestedId = options.nodeId ?? normalizeEndpoint(endpoint);
-  const derivedHostnameEndpoint = resolveHostnameEndpoint(payload.node);
+  const cleanedNodeName = sanitizeHostname(payload.node);
+  const derivedHostnameEndpoint = resolveHostnameEndpoint(cleanedNodeName);
   const canonicalEndpoint = derivedHostnameEndpoint ?? endpoint;
   const canonicalId = normalizeEndpoint(canonicalEndpoint) ?? requestedId;
-  const label = payload.node || endpoint;
+  const label = cleanedNodeName || endpoint;
   const endpointAlias = normalizeEndpoint(endpoint);
   const aliasSet = new Set(
     [requestedId, endpointAlias].filter((candidate) => candidate && candidate !== canonicalId),
@@ -322,7 +341,11 @@ function registerPayload(endpoint, payload, level, options = {}) {
     type: level <= 1 ? 'local' : 'neighborhood',
     metadata: payload,
     aliases: Array.from(aliasSet),
+    loading: false,
+    failed: false,
   });
+  nodeRecord.loading = false;
+  nodeRecord.failed = false;
 
   // link_info exposes immediate neighbors keyed by IP. We treat the first hop
   // from the seed as "local" (green) and anything beyond as "neighborhood"
@@ -333,7 +356,8 @@ function registerPayload(endpoint, payload, level, options = {}) {
     const neighborId = normalizeEndpoint(ip);
     const neighborLevel = level === 0 ? 1 : level + 1;
     const neighborType = neighborLevel <= 1 ? 'local' : 'neighborhood';
-    const neighborEndpoint = resolveHostnameEndpoint(linkInfo.hostname) ?? ip;
+    const cleanedHostname = sanitizeHostname(linkInfo.hostname);
+    const neighborEndpoint = resolveHostnameEndpoint(cleanedHostname) ?? ip;
     const neighborEndpointId = normalizeEndpoint(neighborEndpoint);
     const canonicalNeighborId = neighborEndpointId ?? neighborId;
     const existingNeighborId =
@@ -347,7 +371,7 @@ function registerPayload(endpoint, payload, level, options = {}) {
 
     const neighborRecord = state.upsertNode({
       id: resolvedNeighborId,
-      label: linkInfo.hostname || ip,
+      label: cleanedHostname || ip,
       endpoint: neighborEndpoint,
       level: neighborLevel,
       type: neighborType,
@@ -356,11 +380,12 @@ function registerPayload(endpoint, payload, level, options = {}) {
 
     neighborRecord.metadata = neighborRecord.metadata ?? {};
     neighborRecord.metadata.primaryIp = neighborRecord.metadata.primaryIp ?? ip;
-    neighborRecord.metadata.hostname = linkInfo.hostname ?? neighborRecord.metadata.hostname;
+    neighborRecord.metadata.hostname =
+      cleanedHostname || neighborRecord.metadata.hostname || '';
     // Store last seen link metrics so the info panel can surface them even
     // before we fully expand the neighbor node.
     neighborRecord.lastLinkMetrics = linkInfo;
-    neighborRecord.lastKnownHostname = linkInfo.hostname;
+    neighborRecord.lastKnownHostname = cleanedHostname;
 
     const styleClass = resolveLinkStyleClass(linkInfo.linkType);
 

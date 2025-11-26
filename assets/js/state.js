@@ -41,6 +41,8 @@ export class GraphState {
       endpoint: node.endpoint ?? node.id,
       metadata: node.metadata ?? {},
       expanded: node.expanded ?? false,
+      loading: node.loading ?? false,
+      failed: node.failed ?? false,
       x: node.x ?? Math.random() * 400,
       y: node.y ?? Math.random() * 400,
       vx: 0,
