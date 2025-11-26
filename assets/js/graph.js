@@ -129,7 +129,7 @@ export class GraphRenderer {
       const label = document.createElementNS(SVG_NS, 'text');
 
       circle.setAttribute('r', node.level === 0 ? '12' : '9');
-      circle.classList.add(node.level === 0 ? 'node-root' : 'node-peer');
+      circle.classList.add(this.#nodeClassFor(node));
 
       label.classList.add('node-label');
       label.textContent = node.label;
@@ -329,6 +329,11 @@ export class GraphRenderer {
   #bringGroupToFront(group) {
     if (!group || group.parentNode !== this.nodeLayer) return;
     this.nodeLayer.appendChild(group);
+  }
+
+  #nodeClassFor(node) {
+    if (node.level === 0) return 'node-root';
+    return node.expanded ? 'node-loaded' : 'node-pending';
   }
 
   #showLinkTooltip(event, link) {

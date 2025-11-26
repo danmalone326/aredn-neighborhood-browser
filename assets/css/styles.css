@@ -252,9 +252,15 @@ dl dd {
   stroke-width: 2px;
 }
 
-.node-peer {
+.node-pending {
   fill: var(--warn);
   stroke: rgba(0, 0, 0, 0.25);
+  stroke-width: 1px;
+}
+
+.node-loaded {
+  fill: var(--success);
+  stroke: rgba(0, 0, 0, 0.2);
   stroke-width: 1px;
 }
 
