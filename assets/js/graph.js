@@ -35,6 +35,11 @@ export class GraphRenderer {
     this.sceneGroup.appendChild(this.linkLayer);
     this.sceneGroup.appendChild(this.nodeLayer);
     this.svg.appendChild(this.sceneGroup);
+    this.tooltip = document.createElement('div');
+    this.tooltip.classList.add('tooltip');
+    this.tooltip.style.display = 'none';
+    const container = this.svg.closest('.graph-panel') ?? document.body;
+    container.appendChild(this.tooltip);
 
     this.zoom = {
       scale: 1,
@@ -104,6 +109,9 @@ export class GraphRenderer {
       const line = document.createElementNS(SVG_NS, 'line');
       const className = link.styleClass ?? 'link-default';
       line.classList.add('link-segment', className);
+      line.addEventListener('mouseenter', (event) => this.#showLinkTooltip(event, link));
+      line.addEventListener('mousemove', (event) => this.#positionTooltip(event));
+      line.addEventListener('mouseleave', () => this.#hideTooltip());
       this.linkLayer.appendChild(line);
       return { line, link };
     });
@@ -321,5 +329,35 @@ export class GraphRenderer {
   #bringGroupToFront(group) {
     if (!group || group.parentNode !== this.nodeLayer) return;
     this.nodeLayer.appendChild(group);
+  }
+
+  #showLinkTooltip(event, link) {
+    if (!this.tooltip) return;
+    const type = link.linkType || link.metrics?.linkType || 'Unknown';
+    const parts = [`<strong>Link: ${type}</strong>`];
+    if (link.metrics?.linkCost != null) {
+      parts.push(`Cost: ${link.metrics.linkCost}`);
+    }
+    if (link.metrics?.linkQuality != null) {
+      parts.push(`Quality: ${link.metrics.linkQuality}`);
+    }
+    this.tooltip.innerHTML = parts.join('<br>');
+    this.tooltip.style.display = 'block';
+    this.#positionTooltip(event);
+  }
+
+  #positionTooltip(event) {
+    if (!this.tooltip) return;
+    const container = this.svg.closest('.graph-panel');
+    const bounds = container?.getBoundingClientRect() ?? { left: 0, top: 0 };
+    const offsetX = event.clientX - bounds.left + 12;
+    const offsetY = event.clientY - bounds.top + 12;
+    this.tooltip.style.left = `${offsetX}px`;
+    this.tooltip.style.top = `${offsetY}px`;
+  }
+
+  #hideTooltip() {
+    if (!this.tooltip) return;
+    this.tooltip.style.display = 'none';
   }
 }

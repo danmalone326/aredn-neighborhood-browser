@@ -217,6 +217,9 @@ dl dd {
 .link-rf {
   stroke: var(--success);
 }
+.link-xlink {
+  stroke: #fb923c;
+}
 .link-default {
   stroke: var(--accent);
 }

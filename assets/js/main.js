@@ -255,6 +255,8 @@ function resolveLinkStyleClass(linkType) {
       return 'link-dtd';
     case 'RF':
       return 'link-rf';
+    case 'XLINK':
+      return 'link-xlink';
     default:
       return 'link-default';
   }
