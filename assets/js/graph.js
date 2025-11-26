@@ -4,6 +4,7 @@ const DEFAULT_OPTIONS = {
   springLength: 70,
   springStrength: 0.01,
   damping: 0.9,
+  worldMargin: 600,
 };
 
 /**
@@ -208,9 +209,11 @@ export class GraphRenderer {
     });
 
     // 3) Pull nodes back toward the viewport center and integrate velocity.
-    const padding = Math.max(90, Math.min(this.width, this.height) * 0.12);
-    const maxX = Math.max((this.width ?? 800) - padding, padding);
-    const maxY = Math.max((this.height ?? 600) - padding, padding);
+    const margin = this.options.worldMargin ?? 0;
+    const minX = 0 - margin;
+    const maxX = (this.width ?? 800) + margin;
+    const minY = 0 - margin;
+    const maxY = (this.height ?? 600) + margin;
 
     nodes.forEach((node) => {
       const dx = centerX - node.x;
@@ -223,8 +226,8 @@ export class GraphRenderer {
       node.x += node.vx;
       node.y += node.vy;
 
-      node.x = this.#quantize(Math.min(Math.max(node.x, padding), maxX));
-      node.y = this.#quantize(Math.min(Math.max(node.y, padding), maxY));
+      node.x = this.#quantize(Math.min(Math.max(node.x, minX), maxX));
+      node.y = this.#quantize(Math.min(Math.max(node.y, minY), maxY));
       node.vx = this.#quantize(node.vx, 6);
       node.vy = this.#quantize(node.vy, 6);
     });
