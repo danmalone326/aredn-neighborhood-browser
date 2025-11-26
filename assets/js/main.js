@@ -294,6 +294,11 @@ async function ingestNode(endpoint, level, options = {}) {
     return record;
   } catch (error) {
     setStatus(`Failed to reach ${endpoint}: ${error.message}`, 'error');
+    const targetNode = state.getNode(lookupId);
+    if (targetNode) {
+      targetNode.failed = true;
+    }
+    renderer.sync(state.getGraphData());
     throw error;
   } finally {
     inflightNodes.delete(normalizedId);

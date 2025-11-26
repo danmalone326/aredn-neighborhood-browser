@@ -333,6 +333,7 @@ export class GraphRenderer {
 
   #nodeClassFor(node) {
     if (node.level === 0) return 'node-root';
+    if (node.failed) return 'node-error';
     return node.expanded ? 'node-loaded' : 'node-pending';
   }
 

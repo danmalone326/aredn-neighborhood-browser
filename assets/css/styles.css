@@ -257,6 +257,11 @@ dl dd {
   stroke: rgba(0, 0, 0, 0.25);
   stroke-width: 1px;
 }
+.node-error {
+  stroke: var(--danger);
+  stroke-width: 3px;
+  fill: var(--warn);
+}
 
 .node-loaded {
   fill: var(--success);
