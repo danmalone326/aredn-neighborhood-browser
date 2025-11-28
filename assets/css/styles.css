@@ -20,6 +20,8 @@ body {
   background: var(--bg);
   color: var(--text);
   min-height: 100vh;
+  display: flex;
+  flex-direction: column;
 }
 
 header.app-header {
@@ -148,11 +150,12 @@ button:disabled {
 }
 
 main {
+  flex: 1 1 auto;
+  min-height: 0;
   display: grid;
   grid-template-columns: 3fr 1fr;
   gap: 1rem;
   padding: 1rem 2rem 2rem;
-  min-height: calc(100vh - 120px);
 }
 
 .sim-indicator {
@@ -190,6 +193,8 @@ main {
   background: var(--panel);
   border-radius: 0.75rem;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 .sim-indicator {
@@ -246,7 +251,10 @@ main {
 
 svg#graph-canvas {
   width: 100%;
-  height: min(950px, calc(120vh - 220px));
+  flex: 1 1 auto;
+  min-height: 0;
+  height: min(950px, calc(100vh - 220px));
+  max-height: 100%;
 }
 
 .info-panel {
