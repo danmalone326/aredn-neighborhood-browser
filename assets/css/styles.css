@@ -20,6 +20,8 @@ body {
   background: var(--bg);
   color: var(--text);
   min-height: 100vh;
+  display: flex;
+  flex-direction: column;
 }
 
 header.app-header {
@@ -45,6 +47,7 @@ header p {
   display: flex;
   gap: 0.75rem;
   align-items: flex-end;
+  flex-wrap: wrap;
 }
 
 .seed-input-wrapper {
@@ -72,6 +75,12 @@ header p {
   background: #0b1220;
   color: var(--text);
   min-width: 250px;
+}
+
+.seed-actions {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
 }
 
 .seed-suggestions {
@@ -141,11 +150,51 @@ button:disabled {
 }
 
 main {
+  flex: 1 1 auto;
+  min-height: 0;
   display: grid;
   grid-template-columns: 3fr 1fr;
   gap: 1rem;
   padding: 1rem 2rem 2rem;
-  min-height: calc(100vh - 120px);
+  align-items: stretch;
+}
+
+.side-panels {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  height: 100%;
+  min-height: 0;
+}
+
+.sim-indicator {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  background: rgba(15, 23, 42, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 999px;
+  padding: 0.3rem 0.65rem;
+  font-size: 0.8rem;
+  color: var(--muted);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+  z-index: 5;
+}
+
+.sim-indicator .sim-light {
+  width: 0.65rem;
+  height: 0.65rem;
+  border-radius: 50%;
+  background: var(--warn);
+  box-shadow: 0 0 10px rgba(250, 204, 21, 0.8);
+}
+
+.sim-indicator.stable .sim-light {
+  background: var(--success);
+  box-shadow: 0 0 10px rgba(74, 222, 128, 0.8);
 }
 
 .graph-panel {
@@ -153,7 +202,41 @@ main {
   background: var(--panel);
   border-radius: 0.75rem;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
+
+.sim-indicator {
+  position: absolute;
+  top: 0.6rem;
+  right: 0.6rem;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  background: rgba(15, 23, 42, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 999px;
+  padding: 0.25rem 0.6rem;
+  font-size: 0.75rem;
+  color: var(--muted);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
+  z-index: 5;
+}
+
+.sim-indicator .sim-light {
+  order: 2;
+  width: 0.6rem;
+  height: 0.6rem;
+  border-radius: 50%;
+  background: var(--warn);
+  box-shadow: 0 0 10px rgba(250, 204, 21, 0.8);
+}
+
+.sim-indicator.stable .sim-light {
+  background: var(--success);
+  box-shadow: 0 0 10px rgba(74, 222, 128, 0.8);
+}
+
 
 .graph-status {
   position: absolute;
@@ -177,13 +260,20 @@ main {
 
 svg#graph-canvas {
   width: 100%;
-  height: min(950px, calc(120vh - 220px));
+  flex: 1 1 auto;
+  min-height: 0;
+  height: min(950px, calc(100vh - 220px));
+  max-height: 100%;
 }
 
 .info-panel {
   background: var(--panel);
   border-radius: 0.75rem;
   padding: 1.25rem;
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 
 .info-panel h2 {
@@ -191,6 +281,29 @@ svg#graph-canvas {
 }
 
 .info-panel dl {
+  margin: 0;
+  flex: 1 1 auto;
+}
+
+.stats-panel {
+  background: var(--panel);
+  border-radius: 0.75rem;
+  padding: 1.25rem;
+  min-height: 120px;
+  display: flex;
+  align-items: stretch;
+  margin-top: auto;
+}
+
+.graph-stats {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.95rem;
+}
+
+.graph-stats p {
   margin: 0;
 }
 
@@ -292,6 +405,10 @@ dl dd {
 @media (max-width: 960px) {
   main {
     grid-template-columns: 1fr;
+  }
+
+  .side-panels {
+    width: 100%;
   }
 
   header.app-header {

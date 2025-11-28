@@ -9,16 +9,12 @@
   <body>
     <header class="app-header">
       <div>
-        <h1>
-          <a href="https://github.com/danmalone326/aredn-neighborhood-browser" target="_blank" rel="noopener noreferrer">
-            AREDN Neighborhood Browser
-          </a>
-        </h1>
-        <p>by Dan Malone - AK6DM</p>
+        <h1>AREDN Neighborhood Browser</h1>
+        <p>by Dan Malone - AK6DM  (<a href="https://github.com/danmalone326/aredn-neighborhood-browser" target="_blank" rel="noopener noreferrer">source available on github</a>)</p>
       </div>
       <form id="seed-form" class="seed-form" autocomplete="off">
         <div class="seed-input-wrapper">
-          <label for="seed-input">Start Node</label>
+          <label for="seed-input">Node</label>
           <div class="seed-input-field">
             <input
               type="text"
@@ -32,9 +28,13 @@
             <ul id="seed-suggestions" class="seed-suggestions"></ul>
           </div>
         </div>
-        <button type="submit">Reset</button>
+        <div class="seed-actions">
+          <button type="button" id="add-node-btn">Add</button>
+          <button type="button" id="reset-graph" class="ghost">Reset</button>
+        </div>
       </form>
     </header>
+
 
     <main>
       <section class="graph-panel">
@@ -42,11 +42,17 @@
         <svg id="graph-canvas" role="img" aria-label="AREDN graph"></svg>
       </section>
 
-      <aside class="info-panel" id="info-panel">
-        <h2>Node Details</h2>
-        <p>Select a node to view metadata.</p>
-        <dl id="info-panel-body"></dl>
-      </aside>
+      <div class="side-panels">
+        <aside class="info-panel" id="info-panel">
+          <h2>Node Details</h2>
+          <p>Select a node to view metadata.</p>
+          <dl id="info-panel-body"></dl>
+        </aside>
+
+        <aside class="stats-panel" aria-live="polite">
+          <div class="graph-stats" id="graph-stats"></div>
+        </aside>
+      </div>
     </main>
 
     <script type="module" src="assets/js/main.js"></script>
