@@ -23,6 +23,7 @@ const dom = {
   resetBtn: document.getElementById('reset-graph'),
   seedSuggestions: document.getElementById('seed-suggestions'),
   infoBody: document.getElementById('info-panel-body'),
+  graphStats: document.getElementById('graph-stats'),
 };
 const { container: simIndicatorEl, light: simLightEl } = createSimIndicator();
 const graphPanel = document.querySelector('.graph-panel');
@@ -35,6 +36,12 @@ const renderer = new GraphRenderer(dom.canvas, {
   onNodeClick: (node) => handleNodeSelection(node, { expand: true }),
   onStabilityChange: (stable) => updateSimStatus(stable),
 });
+
+function syncGraph() {
+  const snapshot = state.getGraphData();
+  renderer.sync(snapshot);
+  renderGraphStats(snapshot);
+}
 
 bootstrap();
 
@@ -75,6 +82,7 @@ function bootstrap() {
     hideSeedSuggestions();
   });
 
+  renderGraphStats();
   handleAddNode(DEFAULT_SEED);
 }
 
@@ -92,7 +100,7 @@ function handleAddNode(seedOverride) {
 function resetGraph() {
   inflightNodes.clear();
   state.reset();
-  renderer.sync(state.getGraphData());
+  syncGraph();
   renderer.setActiveNode(null);
   renderInfoMessage('Select a node to see details.');
   hideSeedSuggestions();
@@ -377,7 +385,7 @@ async function ingestNode(endpoint, level, options = {}) {
   if (pendingNode) {
     pendingNode.loading = true;
     pendingNode.failed = false;
-    renderer.sync(state.getGraphData());
+    syncGraph();
   }
   try {
     setStatus(`Querying ${endpoint}...`, 'info');
@@ -400,7 +408,7 @@ async function ingestNode(endpoint, level, options = {}) {
     if (targetNode) {
       targetNode.loading = false;
       targetNode.failed = true;
-      renderer.sync(state.getGraphData());
+      syncGraph();
     }
     throw error;
   } finally {
@@ -525,7 +533,7 @@ function registerPayload(endpoint, payload, level, options = {}) {
   state.markExpanded(nodeRecord.id);
   nodeRecord.loading = false;
   nodeRecord.failed = false;
-  renderer.sync(state.getGraphData());
+  syncGraph();
   return nodeRecord;
 }
 
@@ -554,51 +562,79 @@ function renderNodeDetails(node) {
   }
 
   const metadata = node.metadata || {};
-  const nodeDetails = metadata.node_details || {};
-  const linkCount = Array.from(state.links.values()).filter(
-    (link) => link.source === node.id || link.target === node.id,
-  ).length;
+  const hostnameCandidates = [metadata.hostname, node.lastKnownHostname, metadata.node];
+  const resolvedHostname = hostnameCandidates.find(
+    (value) => typeof value === 'string' && value.trim().length,
+  );
+  const primaryIpCandidates = [
+    metadata.primaryIp,
+    metadata.primary_ip,
+    metadata.primaryIP,
+    node.lastLinkMetrics?.primaryIp,
+    node.lastLinkMetrics?.ip,
+    node.lastLinkMetrics?.ipAddress,
+  ];
+  const primaryIp = primaryIpCandidates.find(
+    (value) => typeof value === 'string' && value.trim().length,
+  );
 
   const entries = [
-    ['Label', node.label],
-    ['Endpoint', node.endpoint],
-    ['Level', node.level === 0 ? 'Seed' : node.level === 1 ? 'Local' : `Neighborhood L${node.level}`],
-    ['Links', `${linkCount}`],
+    ['Hostname', resolvedHostname ? resolveHostnameEndpoint(resolvedHostname) ?? resolvedHostname : 'N/A'],
+    ['Primary IP', primaryIp ?? 'N/A'],
   ];
 
-  if (nodeDetails.model) {
-    entries.push(['Model', nodeDetails.model]);
-  }
-  if (metadata.node) {
-    entries.push(['Node ID', metadata.node]);
-  }
-  if (nodeDetails.description) {
-    entries.push(['Description', nodeDetails.description]);
-  }
-  if (metadata.grid_square) {
-    entries.push(['Grid', metadata.grid_square]);
-  }
-  if (metadata.hostname) {
-    const hostEndpoint = resolveHostnameEndpoint(metadata.hostname) ?? metadata.hostname;
-    entries.push(['Hostname', hostEndpoint]);
-  }
-  if (metadata.primaryIp) {
-    entries.push(['Primary IP', metadata.primaryIp]);
-  }
-  if (metadata.lat && metadata.lon) {
-    entries.push(['Coordinates', `${metadata.lat}, ${metadata.lon}`]);
-  }
-  if (metadata.sysinfo?.uptime) {
-    entries.push(['Uptime', metadata.sysinfo.uptime]);
-  }
-  if (node.lastLinkMetrics) {
-    entries.push(['Link Cost', node.lastLinkMetrics.linkCost]);
-    entries.push(['Link Type', node.lastLinkMetrics.linkType]);
-  }
+  dom.infoBody.innerHTML = entries.map(
+    ([label, value]) => `<dt>${label}</dt><dd>${value ?? 'N/A'}</dd>`,
+  ).join('');
+}
 
-  dom.infoBody.innerHTML = entries
-    .map(([label, value]) => `<dt>${label}</dt><dd>${value ?? 'N/A'}</dd>`)
-    .join('');
+function renderGraphStats(graphData) {
+  if (!dom.graphStats) return;
+  const data = graphData ?? state.getGraphData();
+  const nodes = data.nodes ?? [];
+  const links = data.links ?? [];
+  const linkTypeCounts = links.reduce((acc, link) => {
+    const raw = typeof link.linkType === 'string' ? link.linkType.trim() : '';
+    const key = raw ? raw.toUpperCase() : 'UNSPECIFIED';
+    acc[key] = (acc[key] ?? 0) + 1;
+    return acc;
+  }, {});
+
+  const lines = [];
+  lines.push(`Nodes: ${nodes.length}`);
+  lines.push(`Links: ${links.length}`);
+
+  const knownTypes = [
+    ['WIREGUARD', 'WireGuard links'],
+    ['DTD', 'DtD links'],
+    ['RF', 'RF links'],
+    ['XLINK', 'XLink links'],
+  ];
+
+  knownTypes.forEach(([type, label]) => {
+    const quantity = linkTypeCounts[type] ?? 0;
+    lines.push(`${label}: ${quantity}`);
+    delete linkTypeCounts[type];
+  });
+
+  Object.keys(linkTypeCounts)
+    .sort()
+    .forEach((type) => {
+      const label = type === 'UNSPECIFIED' ? 'Other links' : `${formatLinkTypeLabel(type)} links`;
+      lines.push(`${label}: ${linkTypeCounts[type]}`);
+    });
+
+  dom.graphStats.innerHTML = lines.map((text) => `<p>${text}</p>`).join('');
+}
+
+function formatLinkTypeLabel(token) {
+  if (!token) return 'Other';
+  return token
+    .toLowerCase()
+    .split(/[_\s-]+/)
+    .filter(Boolean)
+    .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
+    .join(' ');
 }
 
 /** Simple status badge helper. */
