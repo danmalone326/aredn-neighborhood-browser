@@ -43,6 +43,7 @@ export class GraphState {
       expanded: node.expanded ?? false,
       loading: node.loading ?? false,
       failed: node.failed ?? false,
+      manual: node.manual ?? false,
       x: node.x ?? Math.random() * 400,
       y: node.y ?? Math.random() * 400,
       vx: 0,

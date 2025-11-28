@@ -27,6 +27,7 @@ export class GraphRenderer {
 
     this.callbacks = {
       onNodeClick: options.onNodeClick ?? (() => {}),
+      onStabilityChange: options.onStabilityChange ?? (() => {}),
     };
 
     this.sceneGroup = document.createElementNS(SVG_NS, 'g');
@@ -58,6 +59,8 @@ export class GraphRenderer {
 
     window.addEventListener('resize', () => this.#syncViewport());
     this.#syncViewport();
+    this.isStable = false;
+    this.stableFrames = 0;
   }
 
   /**
@@ -71,6 +74,9 @@ export class GraphRenderer {
     this.#renderLinks();
     this.#renderNodes();
     this.#ensureAnimation();
+    this.isStable = false;
+    this.stableFrames = 0;
+    this.callbacks.onStabilityChange(false);
   }
 
   /** Highlight a node to show selection feedback. */
@@ -85,6 +91,14 @@ export class GraphRenderer {
         entry.circle.classList.remove('node-active');
       }
     });
+  }
+
+  /** Current center coordinates of the SVG viewport. */
+  getViewportCenter() {
+    return {
+      x: (this.width ?? 800) / 2,
+      y: (this.height ?? 600) / 2,
+    };
   }
 
   /** Recalculate SVG dimensions after layout changes. */
@@ -128,7 +142,7 @@ export class GraphRenderer {
       const circle = document.createElementNS(SVG_NS, 'circle');
       const label = document.createElementNS(SVG_NS, 'text');
 
-      circle.setAttribute('r', node.level === 0 ? '12' : '9');
+      circle.setAttribute('r', node.manual || node.level === 0 ? '12' : '9');
       circle.classList.add(this.#nodeClassFor(node));
 
       label.classList.add('node-label');
@@ -223,6 +237,7 @@ export class GraphRenderer {
     const minY = 0 - margin;
     const maxY = (this.height ?? 600) + margin;
 
+    let maxVelocity = 0;
     nodes.forEach((node) => {
       const dx = centerX - node.x;
       const dy = centerY - node.y;
@@ -238,7 +253,12 @@ export class GraphRenderer {
       node.y = this.#quantize(Math.min(Math.max(node.y, minY), maxY));
       node.vx = this.#quantize(node.vx, 6);
       node.vy = this.#quantize(node.vy, 6);
+      const speed = Math.abs(node.vx) + Math.abs(node.vy);
+      if (speed > maxVelocity) {
+        maxVelocity = speed;
+      }
     });
+    this.#updateStability(maxVelocity);
   }
 
   #drawFrame() {
@@ -332,8 +352,9 @@ export class GraphRenderer {
   }
 
   #nodeClassFor(node) {
-    if (node.level === 0) return 'node-root';
     if (node.failed) return 'node-error';
+    if (node.loading) return 'node-loading';
+    if (node.manual || node.level === 0) return 'node-root';
     return node.expanded ? 'node-loaded' : 'node-pending';
   }
 
@@ -365,5 +386,20 @@ export class GraphRenderer {
   #hideTooltip() {
     if (!this.tooltip) return;
     this.tooltip.style.display = 'none';
+  }
+
+  #updateStability(maxVelocity) {
+    const threshold = this.options.stableThreshold ?? 0.02;
+    const requiredFrames = this.options.stableFrameCount ?? 50;
+    if (maxVelocity < threshold) {
+      this.stableFrames = Math.min(this.stableFrames + 1, requiredFrames);
+    } else {
+      this.stableFrames = 0;
+    }
+    const currentlyStable = this.stableFrames >= requiredFrames;
+    if (currentlyStable !== this.isStable) {
+      this.isStable = currentlyStable;
+      this.callbacks.onStabilityChange(this.isStable);
+    }
   }
 }

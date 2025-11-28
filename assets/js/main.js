@@ -5,6 +5,7 @@
 import { MeshApi } from './api.js';
 import { GraphState } from './state.js';
 import { GraphRenderer } from './graph.js';
+import { createSimIndicator } from './dom.js';
 
 const DEFAULT_SEED = 'localnode.local.mesh';
 const api = new MeshApi();
@@ -18,24 +19,37 @@ const dom = {
   canvas: document.getElementById('graph-canvas'),
   seedForm: document.getElementById('seed-form'),
   seedInput: document.getElementById('seed-input'),
-  seedSubmit: document.querySelector('#seed-form button[type="submit"]'),
+  addButton: document.getElementById('add-node-btn'),
+  resetBtn: document.getElementById('reset-graph'),
   seedSuggestions: document.getElementById('seed-suggestions'),
   infoBody: document.getElementById('info-panel-body'),
 };
+const { container: simIndicatorEl, light: simLightEl } = createSimIndicator();
+const graphPanel = document.querySelector('.graph-panel');
+graphPanel?.appendChild(simIndicatorEl);
+const domSimIndicator = simIndicatorEl;
+const domSimLight = simLightEl;
 
 // Renderer owns the physics simulation and click handling for nodes.
 const renderer = new GraphRenderer(dom.canvas, {
   onNodeClick: (node) => handleNodeSelection(node, { expand: true }),
+  onStabilityChange: (stable) => updateSimStatus(stable),
 });
 
 bootstrap();
 
 /** Entry point that wires DOM events and loads the default node. */
 function bootstrap() {
+  updateSimStatus(false);
   dom.seedForm.addEventListener('submit', (event) => {
     event.preventDefault();
-    loadSeed(dom.seedInput.value.trim() || DEFAULT_SEED, { includeHosts: true });
+    handleAddNode();
   });
+  dom.addButton.addEventListener('click', (event) => {
+    event.preventDefault();
+    handleAddNode();
+  });
+  dom.resetBtn.addEventListener('click', resetGraph);
 
   dom.seedInput.addEventListener('input', handleSeedInputChange);
   dom.seedInput.addEventListener('focus', () => {
@@ -61,29 +75,51 @@ function bootstrap() {
     hideSeedSuggestions();
   });
 
-  loadSeed(DEFAULT_SEED, { includeHosts: true });
+  handleAddNode(DEFAULT_SEED);
+}
+
+/** Add a node from the input field (or provided value) into the graph. */
+function handleAddNode(seedOverride) {
+  const candidate =
+    typeof seedOverride === 'string' ? seedOverride : dom.seedInput.value.trim();
+  const target = candidate || DEFAULT_SEED;
+  dom.seedInput.value = target;
+  hideSeedSuggestions();
+  addNode(target, { manualSeed: true, includeHosts: true });
+}
+
+/** Clear all rendered nodes/links but keep cached host suggestions. */
+function resetGraph() {
+  inflightNodes.clear();
+  state.reset();
+  renderer.sync(state.getGraphData());
+  renderer.setActiveNode(null);
+  renderInfoMessage('Select a node to see details.');
+  hideSeedSuggestions();
+  setStatus('Graph cleared. Add a node to begin exploring.', 'info');
 }
 
 /**
- * Load a seed host, resetting the graph before populating with new data.
+ * Adds a root node into the current graph without clearing existing nodes.
  * @param {string} seedHost
+ * @param {Object} options
  */
-async function loadSeed(seedHost, { includeHosts = false } = {}) {
+async function addNode(seedHost, { manualSeed = false, includeHosts = false } = {}) {
   const target = seedHost || DEFAULT_SEED;
   setStatus(`Loading ${target}...`, 'info');
-  dom.seedInput.value = target;
   toggleControls(true);
-  if (includeHosts) {
-    hostDirectory = [];
-    hideSeedSuggestions();
-  }
-  state.reset();
-  renderer.sync(state.getGraphData());
   renderInfoMessage('Select a node to see details.');
 
   try {
-    const root = await ingestNode(target, 0, { includeHosts });
-    renderer.setActiveNode(root?.id);
+    const initialPosition = manualSeed
+      ? randomizePosition(renderer.getViewportCenter(), 100)
+      : undefined;
+    const root = await ingestNode(target, 0, {
+      includeHosts,
+      manualSeed,
+      initialPosition,
+    });
+    renderer.setActiveNode(root?.id ?? null);
     handleNodeSelection(root, { expand: false });
   } catch (error) {
     console.error(error);
@@ -108,12 +144,25 @@ function normalizeEndpoint(value) {
 /** Toggle input/button disable state during network work. */
 function toggleControls(disabled) {
   dom.seedInput.disabled = disabled;
-  dom.seedSubmit.disabled = disabled;
+  dom.addButton.disabled = disabled;
+  dom.resetBtn.disabled = disabled;
 }
 
 /** Render a friendly message in the info panel. */
 function renderInfoMessage(message) {
   dom.infoBody.innerHTML = `<dd>${message}</dd>`;
+}
+
+/** Update simulation status indicator based on force layout movement. */
+function updateSimStatus(isStable) {
+  if (!domSimIndicator) return;
+  if (isStable) {
+    domSimIndicator.classList.add('stable');
+    domSimLight?.setAttribute('title', 'Layout stable');
+  } else {
+    domSimIndicator.classList.remove('stable');
+    domSimLight?.setAttribute('title', 'Layout settling…');
+  }
 }
 
 /** Handle search box typing to show host matches. */
@@ -198,26 +247,39 @@ function applySeedSuggestion(host) {
 
   dom.seedInput.value = nextSeed;
   hideSeedSuggestions();
-  loadSeed(nextSeed, { includeHosts: true });
+  addNode(nextSeed, { manualSeed: true, includeHosts: true });
 }
 
 /** Persist host list from the most recent seed node response. */
 function updateHostDirectory(entries = []) {
-  hostDirectory = entries
-    .filter((entry) => {
-      if (!entry || (!entry.name && !entry.ip)) return false;
-      const name = sanitizeHostname(entry.name)?.toLowerCase() ?? '';
-      return !name.endsWith('.local.mesh');
-    })
-    .map((entry) => ({
-      name: sanitizeHostname(entry.name),
-      ip: entry.ip?.trim() ?? '',
-    }))
-    .sort((a, b) => {
-      const aLabel = a.name?.toLowerCase() || a.ip;
-      const bLabel = b.name?.toLowerCase() || b.ip;
-      return aLabel.localeCompare(bLabel);
+  if (!entries.length) return;
+  const existingMap = new Map();
+  hostDirectory.forEach((entry) => {
+    const key = `${entry.name || ''}|${entry.ip || ''}`;
+    existingMap.set(key, entry);
+  });
+
+  entries
+    .filter((entry) => entry && (entry.name || entry.ip))
+    .forEach((entry) => {
+      const sanitizedName = sanitizeHostname(entry.name);
+      const lowerName = sanitizedName.toLowerCase();
+      if (lowerName.endsWith('.local.mesh')) return;
+      const payload = {
+        name: sanitizedName,
+        ip: entry.ip?.trim() ?? '',
+      };
+      const key = `${payload.name || ''}|${payload.ip || ''}`;
+      if (!existingMap.has(key)) {
+        existingMap.set(key, payload);
+      }
     });
+
+  hostDirectory = Array.from(existingMap.values()).sort((a, b) => {
+    const aLabel = a.name?.toLowerCase() || a.ip;
+    const bLabel = b.name?.toLowerCase() || b.ip;
+    return aLabel.localeCompare(bLabel);
+  });
 }
 
 /**
@@ -238,6 +300,29 @@ function sanitizeHostname(value) {
   if (!value) return '';
   const [firstLine] = value.split(/\r?\n/);
   return firstLine.trim();
+}
+
+function randomizePosition(base = renderer.getViewportCenter(), spread = 100) {
+  const nodes = state.getGraphData().nodes;
+  const taken = new Set(
+    nodes
+      .filter((node) => typeof node.x === 'number' && typeof node.y === 'number')
+      .map((node) => `${node.x.toFixed(3)}:${node.y.toFixed(3)}`),
+  );
+  const centerX = base?.x ?? renderer.getViewportCenter().x;
+  const centerY = base?.y ?? renderer.getViewportCenter().y;
+  for (let attempt = 0; attempt < 30; attempt += 1) {
+    const x = centerX + (Math.random() - 0.5) * spread;
+    const y = centerY + (Math.random() - 0.5) * spread;
+    const key = `${x.toFixed(3)}:${y.toFixed(3)}`;
+    if (!taken.has(key)) {
+      return { x, y };
+    }
+  }
+  return {
+    x: centerX + (Math.random() - 0.5) * spread,
+    y: centerY + (Math.random() - 0.5) * spread,
+  };
 }
 
 /**
@@ -268,7 +353,13 @@ function resolveLinkStyleClass(linkType) {
  * @param {number} level
  */
 async function ingestNode(endpoint, level, options = {}) {
-  const { nodeId, includeHosts = false } = options;
+  const {
+    nodeId,
+    includeHosts = false,
+    manualSeed = false,
+    initialPosition,
+    originNode = null,
+  } = options;
   const normalizedId = normalizeEndpoint(endpoint);
   const lookupId = nodeId ?? normalizedId;
   const existing = state.getNode(lookupId);
@@ -295,7 +386,12 @@ async function ingestNode(endpoint, level, options = {}) {
       updateHostDirectory(payload.hosts ?? []);
       handleSeedInputChange();
     }
-    const record = registerPayload(endpoint, payload, level, { nodeId });
+    const record = registerPayload(endpoint, payload, level, {
+      nodeId,
+      manualSeed,
+      initialPosition,
+      originNode,
+    });
     setStatus(`Loaded ${Object.keys(payload.link_info ?? {}).length} links from ${record.label}`, 'success');
     return record;
   } catch (error) {
@@ -333,7 +429,9 @@ function registerPayload(endpoint, payload, level, options = {}) {
   const aliasSet = new Set(
     [requestedId, endpointAlias].filter((candidate) => candidate && candidate !== canonicalId),
   );
-  const nodeRecord = state.upsertNode({
+  const existingRoot = state.getNode(canonicalId);
+  const manualFlag = existingRoot?.manual || options.manualSeed || false;
+  const nodePayload = {
     id: canonicalId,
     label,
     endpoint: canonicalEndpoint,
@@ -341,18 +439,28 @@ function registerPayload(endpoint, payload, level, options = {}) {
     type: level <= 1 ? 'local' : 'neighborhood',
     metadata: payload,
     aliases: Array.from(aliasSet),
-    loading: false,
-    failed: false,
-  });
+    manual: manualFlag,
+  };
+  if (!existingRoot && options.manualSeed && options.initialPosition) {
+    nodePayload.x = options.initialPosition.x;
+    nodePayload.y = options.initialPosition.y;
+  }
+  const nodeRecord = state.upsertNode(nodePayload);
+  nodeRecord.manual = manualFlag;
   nodeRecord.loading = false;
   nodeRecord.failed = false;
+  const parentPosition = {
+    x: options.originNode?.x ?? nodeRecord.x ?? null,
+    y: options.originNode?.y ?? nodeRecord.y ?? null,
+  };
 
   // link_info exposes immediate neighbors keyed by IP. We treat the first hop
   // from the seed as "local" (green) and anything beyond as "neighborhood"
   // (yellow). This assumption is documented so it can be revisited if the API
   // later distinguishes the types explicitly.
   const entries = Object.entries(payload.link_info ?? {});
-  entries.forEach(([ip, linkInfo]) => {
+  const totalNeighbors = entries.length || 1;
+  entries.forEach(([ip, linkInfo], index) => {
     const neighborId = normalizeEndpoint(ip);
     const neighborLevel = level === 0 ? 1 : level + 1;
     const neighborType = neighborLevel <= 1 ? 'local' : 'neighborhood';
@@ -369,14 +477,29 @@ function registerPayload(endpoint, payload, level, options = {}) {
       ),
     );
 
-    const neighborRecord = state.upsertNode({
+    const existingNeighbor = state.getNode(resolvedNeighborId);
+    const neighborPayload = {
       id: resolvedNeighborId,
       label: cleanedHostname || ip,
       endpoint: neighborEndpoint,
       level: neighborLevel,
       type: neighborType,
       aliases: Array.from(aliasSet),
-    });
+    };
+    if (!existingNeighbor) {
+      if (parentPosition.x != null && parentPosition.y != null) {
+        const angle = (2 * Math.PI * index) / totalNeighbors;
+        const radius = 100;
+        neighborPayload.x = parentPosition.x + radius * Math.cos(angle);
+        neighborPayload.y = parentPosition.y + radius * Math.sin(angle);
+      } else {
+        const jittered = randomizePosition(renderer.getViewportCenter(), 100);
+        neighborPayload.x = jittered.x;
+        neighborPayload.y = jittered.y;
+      }
+    }
+
+    const neighborRecord = state.upsertNode(neighborPayload);
 
     neighborRecord.metadata = neighborRecord.metadata ?? {};
     neighborRecord.metadata.primaryIp = neighborRecord.metadata.primaryIp ?? ip;
@@ -400,6 +523,8 @@ function registerPayload(endpoint, payload, level, options = {}) {
   });
 
   state.markExpanded(nodeRecord.id);
+  nodeRecord.loading = false;
+  nodeRecord.failed = false;
   renderer.sync(state.getGraphData());
   return nodeRecord;
 }
@@ -411,7 +536,7 @@ async function handleNodeSelection(node, { expand }) {
   renderNodeDetails(node);
   if (expand && !node.expanded) {
     try {
-      await ingestNode(node.endpoint, node.level ?? 1, { nodeId: node.id });
+      await ingestNode(node.endpoint, node.level ?? 1, { nodeId: node.id, originNode: node });
     } catch (error) {
       console.error(error);
     }
