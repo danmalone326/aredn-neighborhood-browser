@@ -31,5 +31,6 @@ AREDN Neighborhood Browser is a lightweight visualization tool for Amateur Radio
 
 - The code was intentionally written without external dependencies so it can run on an offline mesh.
 - Hostnames returned with PTR diagnostic text are sanitized automatically (text before the first newline).
+- This project was primarily developed by prompting AI assistants.
 
 Contributions and suggestions are welcome! Open an issue or PR on [GitHub](https://github.com/danmalone326/aredn-neighborhood-browser).***
