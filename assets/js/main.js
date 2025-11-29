@@ -439,13 +439,16 @@ function registerPayload(endpoint, payload, level, options = {}) {
   );
   const existingRoot = state.getNode(canonicalId);
   const manualFlag = existingRoot?.manual || options.manualSeed || false;
+  const mergedMetadata = payload
+    ? { ...(existingRoot?.metadata ?? {}), ...payload }
+    : existingRoot?.metadata ?? {};
   const nodePayload = {
     id: canonicalId,
     label,
     endpoint: canonicalEndpoint,
     level,
     type: level <= 1 ? 'local' : 'neighborhood',
-    metadata: payload,
+    metadata: mergedMetadata,
     aliases: Array.from(aliasSet),
     manual: manualFlag,
   };
