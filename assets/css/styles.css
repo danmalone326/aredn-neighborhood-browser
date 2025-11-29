@@ -307,6 +307,11 @@ svg#graph-canvas {
   margin: 0;
 }
 
+.graph-stats__row--indented {
+  padding-left: 1rem;
+  color: var(--muted);
+}
+
 dl dt {
   font-weight: 600;
   margin-top: 0.75rem;
@@ -361,8 +366,8 @@ dl dd {
 
 .node-root {
   fill: #f8fafc;
-  stroke: var(--accent);
-  stroke-width: 2px;
+  stroke: rgba(0, 0, 0, 0.35);
+  stroke-width: 1px;
 }
 
 .node-pending {
@@ -376,20 +381,15 @@ dl dd {
   stroke-width: 3px;
 }
 .node-error {
+  fill: var(--warn);
   stroke: var(--danger);
   stroke-width: 3px;
-  fill: var(--warn);
 }
 
 .node-loaded {
   fill: var(--success);
   stroke: rgba(0, 0, 0, 0.2);
   stroke-width: 1px;
-}
-
-.node-active {
-  stroke: var(--accent);
-  stroke-width: 3px;
 }
 
 .tooltip {

@@ -36,10 +36,19 @@ const renderer = new GraphRenderer(dom.canvas, {
   onNodeClick: (node) => handleNodeSelection(node, { expand: true }),
   onStabilityChange: (stable) => updateSimStatus(stable),
 });
+let activeNodeId = null;
+
+function setActiveNode(nodeId) {
+  activeNodeId = nodeId ?? null;
+  renderer.setActiveNode(nodeId ?? null);
+}
 
 function syncGraph() {
   const snapshot = state.getGraphData();
   renderer.sync(snapshot);
+  if (activeNodeId) {
+    setActiveNode(activeNodeId);
+  }
   renderGraphStats(snapshot);
 }
 
@@ -101,7 +110,7 @@ function resetGraph() {
   inflightNodes.clear();
   state.reset();
   syncGraph();
-  renderer.setActiveNode(null);
+  setActiveNode(null);
   renderInfoMessage('Select a node to see details.');
   hideSeedSuggestions();
   setStatus('Graph cleared. Add a node to begin exploring.', 'info');
@@ -127,7 +136,7 @@ async function addNode(seedHost, { manualSeed = false, includeHosts = false } = 
       manualSeed,
       initialPosition,
     });
-    renderer.setActiveNode(root?.id ?? null);
+    setActiveNode(root?.id ?? null);
     handleNodeSelection(root, { expand: false });
   } catch (error) {
     console.error(error);
@@ -439,13 +448,16 @@ function registerPayload(endpoint, payload, level, options = {}) {
   );
   const existingRoot = state.getNode(canonicalId);
   const manualFlag = existingRoot?.manual || options.manualSeed || false;
+  const mergedMetadata = payload
+    ? { ...(existingRoot?.metadata ?? {}), ...payload }
+    : existingRoot?.metadata ?? {};
   const nodePayload = {
     id: canonicalId,
     label,
     endpoint: canonicalEndpoint,
     level,
     type: level <= 1 ? 'local' : 'neighborhood',
-    metadata: payload,
+    metadata: mergedMetadata,
     aliases: Array.from(aliasSet),
     manual: manualFlag,
   };
@@ -468,6 +480,7 @@ function registerPayload(endpoint, payload, level, options = {}) {
   // later distinguishes the types explicitly.
   const entries = Object.entries(payload.link_info ?? {});
   const totalNeighbors = entries.length || 1;
+  const hostEntries = [];
   entries.forEach(([ip, linkInfo], index) => {
     const neighborId = normalizeEndpoint(ip);
     const neighborLevel = level === 0 ? 1 : level + 1;
@@ -528,7 +541,15 @@ function registerPayload(endpoint, payload, level, options = {}) {
       linkType: linkInfo.linkType,
       metrics: linkInfo,
     });
+
+    if (cleanedHostname || ip) {
+      hostEntries.push({ name: cleanedHostname, ip });
+    }
   });
+
+  if (hostEntries.length) {
+    updateHostDirectory(hostEntries);
+  }
 
   state.markExpanded(nodeRecord.id);
   nodeRecord.loading = false;
@@ -540,7 +561,7 @@ function registerPayload(endpoint, payload, level, options = {}) {
 /** Handles node selection, optionally triggering expansion. */
 async function handleNodeSelection(node, { expand }) {
   if (!node) return;
-  renderer.setActiveNode(node.id);
+  setActiveNode(node.id);
   renderNodeDetails(node);
   if (expand && !node.expanded) {
     try {
@@ -601,8 +622,8 @@ function renderGraphStats(graphData) {
   }, {});
 
   const lines = [];
-  lines.push(`Nodes: ${nodes.length}`);
-  lines.push(`Links: ${links.length}`);
+  lines.push({ text: `Nodes: ${nodes.length}`, indent: false });
+  lines.push({ text: `Total Links: ${links.length}`, indent: false });
 
   const knownTypes = [
     ['WIREGUARD', 'WireGuard links'],
@@ -613,7 +634,7 @@ function renderGraphStats(graphData) {
 
   knownTypes.forEach(([type, label]) => {
     const quantity = linkTypeCounts[type] ?? 0;
-    lines.push(`${label}: ${quantity}`);
+    lines.push({ text: `${label}: ${quantity}`, indent: true });
     delete linkTypeCounts[type];
   });
 
@@ -621,10 +642,17 @@ function renderGraphStats(graphData) {
     .sort()
     .forEach((type) => {
       const label = type === 'UNSPECIFIED' ? 'Other links' : `${formatLinkTypeLabel(type)} links`;
-      lines.push(`${label}: ${linkTypeCounts[type]}`);
+      lines.push({ text: `${label}: ${linkTypeCounts[type]}`, indent: true });
     });
 
-  dom.graphStats.innerHTML = lines.map((text) => `<p>${text}</p>`).join('');
+  dom.graphStats.innerHTML = lines
+    .map((entry) => {
+      const { text, indent } = typeof entry === 'string' ? { text: entry, indent: false } : entry;
+      const classes = ['graph-stats__row'];
+      if (indent) classes.push('graph-stats__row--indented');
+      return `<p class="${classes.join(' ')}">${text}</p>`;
+    })
+    .join('');
 }
 
 function formatLinkTypeLabel(token) {

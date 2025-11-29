@@ -1,4 +1,6 @@
 const SVG_NS = 'http://www.w3.org/2000/svg';
+const NODE_RADIUS = 10;
+const NODE_SELECTED_RADIUS = 13;
 const DEFAULT_OPTIONS = {
   repulsion: 6500,
   springLength: 70,
@@ -84,7 +86,9 @@ export class GraphRenderer {
     this.activeNodeId = nodeId;
     this.nodeElements.forEach((entry) => {
       if (!entry?.circle) return;
-      if (entry.node.id === nodeId) {
+      const isActive = entry.node.id === nodeId;
+      entry.circle.setAttribute('r', this.#circleRadiusFor(entry.node, isActive));
+      if (isActive) {
         entry.circle.classList.add('node-active');
         this.#bringGroupToFront(entry.group);
       } else {
@@ -142,7 +146,7 @@ export class GraphRenderer {
       const circle = document.createElementNS(SVG_NS, 'circle');
       const label = document.createElementNS(SVG_NS, 'text');
 
-      circle.setAttribute('r', node.manual || node.level === 0 ? '12' : '9');
+      circle.setAttribute('r', this.#circleRadiusFor(node, false));
       circle.classList.add(this.#nodeClassFor(node));
 
       label.classList.add('node-label');
@@ -349,6 +353,10 @@ export class GraphRenderer {
   #bringGroupToFront(group) {
     if (!group || group.parentNode !== this.nodeLayer) return;
     this.nodeLayer.appendChild(group);
+  }
+
+  #circleRadiusFor(_node, isActive) {
+    return isActive ? NODE_SELECTED_RADIUS : NODE_RADIUS;
   }
 
   #nodeClassFor(node) {
