@@ -307,6 +307,11 @@ svg#graph-canvas {
   margin: 0;
 }
 
+.graph-stats__row--indented {
+  padding-left: 1rem;
+  color: var(--muted);
+}
+
 dl dt {
   font-weight: 600;
   margin-top: 0.75rem;

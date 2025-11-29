@@ -622,8 +622,8 @@ function renderGraphStats(graphData) {
   }, {});
 
   const lines = [];
-  lines.push(`Nodes: ${nodes.length}`);
-  lines.push(`Links: ${links.length}`);
+  lines.push({ text: `Nodes: ${nodes.length}`, indent: false });
+  lines.push({ text: `Total Links: ${links.length}`, indent: false });
 
   const knownTypes = [
     ['WIREGUARD', 'WireGuard links'],
@@ -634,7 +634,7 @@ function renderGraphStats(graphData) {
 
   knownTypes.forEach(([type, label]) => {
     const quantity = linkTypeCounts[type] ?? 0;
-    lines.push(`${label}: ${quantity}`);
+    lines.push({ text: `${label}: ${quantity}`, indent: true });
     delete linkTypeCounts[type];
   });
 
@@ -642,10 +642,17 @@ function renderGraphStats(graphData) {
     .sort()
     .forEach((type) => {
       const label = type === 'UNSPECIFIED' ? 'Other links' : `${formatLinkTypeLabel(type)} links`;
-      lines.push(`${label}: ${linkTypeCounts[type]}`);
+      lines.push({ text: `${label}: ${linkTypeCounts[type]}`, indent: true });
     });
 
-  dom.graphStats.innerHTML = lines.map((text) => `<p>${text}</p>`).join('');
+  dom.graphStats.innerHTML = lines
+    .map((entry) => {
+      const { text, indent } = typeof entry === 'string' ? { text: entry, indent: false } : entry;
+      const classes = ['graph-stats__row'];
+      if (indent) classes.push('graph-stats__row--indented');
+      return `<p class="${classes.join(' ')}">${text}</p>`;
+    })
+    .join('');
 }
 
 function formatLinkTypeLabel(token) {
