@@ -471,6 +471,7 @@ function registerPayload(endpoint, payload, level, options = {}) {
   // later distinguishes the types explicitly.
   const entries = Object.entries(payload.link_info ?? {});
   const totalNeighbors = entries.length || 1;
+  const hostEntries = [];
   entries.forEach(([ip, linkInfo], index) => {
     const neighborId = normalizeEndpoint(ip);
     const neighborLevel = level === 0 ? 1 : level + 1;
@@ -531,7 +532,15 @@ function registerPayload(endpoint, payload, level, options = {}) {
       linkType: linkInfo.linkType,
       metrics: linkInfo,
     });
+
+    if (cleanedHostname || ip) {
+      hostEntries.push({ name: cleanedHostname, ip });
+    }
   });
+
+  if (hostEntries.length) {
+    updateHostDirectory(hostEntries);
+  }
 
   state.markExpanded(nodeRecord.id);
   nodeRecord.loading = false;
