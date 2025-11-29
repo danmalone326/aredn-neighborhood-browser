@@ -36,10 +36,19 @@ const renderer = new GraphRenderer(dom.canvas, {
   onNodeClick: (node) => handleNodeSelection(node, { expand: true }),
   onStabilityChange: (stable) => updateSimStatus(stable),
 });
+let activeNodeId = null;
+
+function setActiveNode(nodeId) {
+  activeNodeId = nodeId ?? null;
+  renderer.setActiveNode(nodeId ?? null);
+}
 
 function syncGraph() {
   const snapshot = state.getGraphData();
   renderer.sync(snapshot);
+  if (activeNodeId) {
+    setActiveNode(activeNodeId);
+  }
   renderGraphStats(snapshot);
 }
 
@@ -101,7 +110,7 @@ function resetGraph() {
   inflightNodes.clear();
   state.reset();
   syncGraph();
-  renderer.setActiveNode(null);
+  setActiveNode(null);
   renderInfoMessage('Select a node to see details.');
   hideSeedSuggestions();
   setStatus('Graph cleared. Add a node to begin exploring.', 'info');
@@ -127,7 +136,7 @@ async function addNode(seedHost, { manualSeed = false, includeHosts = false } = 
       manualSeed,
       initialPosition,
     });
-    renderer.setActiveNode(root?.id ?? null);
+    setActiveNode(root?.id ?? null);
     handleNodeSelection(root, { expand: false });
   } catch (error) {
     console.error(error);
@@ -552,7 +561,7 @@ function registerPayload(endpoint, payload, level, options = {}) {
 /** Handles node selection, optionally triggering expansion. */
 async function handleNodeSelection(node, { expand }) {
   if (!node) return;
-  renderer.setActiveNode(node.id);
+  setActiveNode(node.id);
   renderNodeDetails(node);
   if (expand && !node.expanded) {
     try {
