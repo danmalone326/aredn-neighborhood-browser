@@ -369,14 +369,20 @@ export class GraphRenderer {
   #showLinkTooltip(event, link) {
     if (!this.tooltip) return;
     const type = link.linkType || link.metrics?.linkType || 'Unknown';
-    const parts = [`<strong>Link: ${type}</strong>`];
+    this.tooltip.replaceChildren();
+    const heading = document.createElement('strong');
+    heading.textContent = `Link: ${type}`;
+    this.tooltip.appendChild(heading);
     if (link.metrics?.linkCost != null) {
-      parts.push(`Cost: ${link.metrics.linkCost}`);
+      const cost = document.createElement('div');
+      cost.textContent = `Cost: ${link.metrics.linkCost}`;
+      this.tooltip.appendChild(cost);
     }
     if (link.metrics?.linkQuality != null) {
-      parts.push(`Quality: ${link.metrics.linkQuality}`);
+      const quality = document.createElement('div');
+      quality.textContent = `Quality: ${link.metrics.linkQuality}`;
+      this.tooltip.appendChild(quality);
     }
-    this.tooltip.innerHTML = parts.join('<br>');
     this.tooltip.style.display = 'block';
     this.#positionTooltip(event);
   }
