@@ -445,6 +445,11 @@ function registerPayload(endpoint, payload, level, options = {}) {
   const canonicalId = normalizeEndpoint(canonicalEndpoint) ?? requestedId;
   const label = cleanedNodeName || endpoint;
   const endpointAlias = normalizeEndpoint(endpoint);
+  const existingByRequested =
+    state.getNode(requestedId) ?? (endpointAlias ? state.getNode(endpointAlias) : undefined);
+  if (existingByRequested && canonicalId && existingByRequested.id !== canonicalId) {
+    state.rekeyNode(existingByRequested.id, canonicalId);
+  }
   const aliasSet = new Set(
     [requestedId, endpointAlias].filter((candidate) => candidate && candidate !== canonicalId),
   );
