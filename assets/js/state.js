@@ -102,6 +102,66 @@ export class GraphState {
       links: Array.from(this.links.values()),
     };
   }
+
+  /**
+   * Re-key a node to a new id, updating aliases and links.
+   * If the new id already exists, merges old node data into it.
+   * @param {string} oldId
+   * @param {string} newId
+   * @returns {Object|undefined}
+   */
+  rekeyNode(oldId, newId) {
+    if (!oldId || !newId) return undefined;
+    const resolvedOld = this.resolveNodeId(oldId) ?? oldId;
+    const resolvedNew = this.resolveNodeId(newId) ?? newId;
+    if (resolvedOld === resolvedNew) {
+      return this.nodes.get(resolvedNew);
+    }
+
+    const oldNode = this.nodes.get(resolvedOld);
+    const existingNew = this.nodes.get(resolvedNew);
+    if (!oldNode && !existingNew) return undefined;
+
+    if (existingNew && oldNode && existingNew !== oldNode) {
+      const level = Math.min(existingNew.level ?? Infinity, oldNode.level ?? Infinity);
+      const type = level <= 1 ? 'local' : existingNew.type ?? oldNode.type;
+      Object.assign(existingNew, oldNode, {
+        id: resolvedNew,
+        level,
+        type,
+        metadata: { ...(oldNode.metadata ?? {}), ...(existingNew.metadata ?? {}) },
+        expanded: existingNew.expanded || oldNode.expanded,
+        loading: existingNew.loading || oldNode.loading,
+        failed: existingNew.failed || oldNode.failed,
+        manual: existingNew.manual || oldNode.manual,
+      });
+      this.nodes.delete(resolvedOld);
+    } else if (!existingNew && oldNode) {
+      this.nodes.delete(resolvedOld);
+      oldNode.id = resolvedNew;
+      this.nodes.set(resolvedNew, oldNode);
+    }
+
+    for (const [alias, id] of this.aliases.entries()) {
+      if (id === resolvedOld) {
+        this.aliases.set(alias, resolvedNew);
+      }
+    }
+    this.registerAlias(resolvedOld, resolvedNew);
+    this.registerAlias(resolvedNew, resolvedNew);
+
+    const relinked = new Map();
+    this.links.forEach((link) => {
+      const source = link.source === resolvedOld ? resolvedNew : link.source;
+      const target = link.target === resolvedOld ? resolvedNew : link.target;
+      const pair = [source, target].sort();
+      const key = `${pair[0]}<->${pair[1]}`;
+      relinked.set(key, { ...link, id: key, source: pair[0], target: pair[1] });
+    });
+    this.links = relinked;
+
+    return this.nodes.get(resolvedNew);
+  }
   resolveNodeId(identifier) {
     if (!identifier) return undefined;
     if (this.nodes.has(identifier)) return identifier;

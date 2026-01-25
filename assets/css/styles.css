@@ -167,36 +167,6 @@ main {
   min-height: 0;
 }
 
-.sim-indicator {
-  position: absolute;
-  top: 0.75rem;
-  right: 0.75rem;
-  display: flex;
-  align-items: center;
-  gap: 0.35rem;
-  background: rgba(15, 23, 42, 0.9);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 999px;
-  padding: 0.3rem 0.65rem;
-  font-size: 0.8rem;
-  color: var(--muted);
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
-  z-index: 5;
-}
-
-.sim-indicator .sim-light {
-  width: 0.65rem;
-  height: 0.65rem;
-  border-radius: 50%;
-  background: var(--warn);
-  box-shadow: 0 0 10px rgba(250, 204, 21, 0.8);
-}
-
-.sim-indicator.stable .sim-light {
-  background: var(--success);
-  box-shadow: 0 0 10px rgba(74, 222, 128, 0.8);
-}
-
 .graph-panel {
   position: relative;
   background: var(--panel);

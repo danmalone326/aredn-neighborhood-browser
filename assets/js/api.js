@@ -6,10 +6,10 @@
 export class MeshApi {
   /**
    * @param {Object} [options]
-   * @param {number} [options.timeoutMs=8000] - Hard request timeout.
+   * @param {number} [options.timeoutMs=10000] - Hard request timeout.
    */
   constructor(options = {}) {
-    this.timeoutMs = options.timeoutMs ?? 8000;
+    this.timeoutMs = options.timeoutMs ?? 10000;
   }
 
   /**
@@ -18,7 +18,37 @@ export class MeshApi {
    * @returns {Promise<Object>} Parsed JSON payload.
    */
   async fetchLinkInfo(host, options = {}) {
-    const url = this.#buildUrl(host, options);
+    const { primary, fallback } = this.#buildUrls(host, options);
+    try {
+      return await this.#fetchJson(primary);
+    } catch (error) {
+      if (fallback) {
+        try {
+          return await this.#fetchJson(fallback);
+        } catch (fallbackError) {
+          throw fallbackError;
+        }
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Normalizes the user-supplied host into a request URL.
+   * @param {string} host
+   * @returns {string}
+   */
+  #buildUrls(host, options = {}) {
+    const trimmed = host.trim();
+    const prefixed = /^https?:\/\//i.test(trimmed) ? trimmed : `http://${trimmed}`;
+    const sanitized = prefixed.replace(/\/$/, '');
+    const query = options.includeHosts ? '&hosts=1' : '';
+    const primary = `${sanitized}/a/sysinfo?link_info=1${query}`;
+    const fallback = `${sanitized}/cgi-bin/sysinfo.json?link_info=1${query}`;
+    return { primary, fallback };
+  }
+
+  async #fetchJson(url) {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), this.timeoutMs);
 
@@ -36,18 +66,5 @@ export class MeshApi {
     } finally {
       clearTimeout(timeoutId);
     }
-  }
-
-  /**
-   * Normalizes the user-supplied host into a request URL.
-   * @param {string} host
-   * @returns {string}
-   */
-  #buildUrl(host, options = {}) {
-    const trimmed = host.trim();
-    const prefixed = /^https?:\/\//i.test(trimmed) ? trimmed : `http://${trimmed}`;
-    const sanitized = prefixed.replace(/\/$/, '');
-    const base = `${sanitized}/cgi-bin/sysinfo.json?link_info=1`;
-    return options.includeHosts ? `${base}&hosts=1` : base;
   }
 }

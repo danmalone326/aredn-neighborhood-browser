@@ -167,7 +167,9 @@ function toggleControls(disabled) {
 
 /** Render a friendly message in the info panel. */
 function renderInfoMessage(message) {
-  dom.infoBody.innerHTML = `<dd>${message}</dd>`;
+  const dd = document.createElement('dd');
+  dd.textContent = message;
+  dom.infoBody.replaceChildren(dd);
 }
 
 /** Update simulation status indicator based on force layout movement. */
@@ -443,6 +445,11 @@ function registerPayload(endpoint, payload, level, options = {}) {
   const canonicalId = normalizeEndpoint(canonicalEndpoint) ?? requestedId;
   const label = cleanedNodeName || endpoint;
   const endpointAlias = normalizeEndpoint(endpoint);
+  const existingByRequested =
+    state.getNode(requestedId) ?? (endpointAlias ? state.getNode(endpointAlias) : undefined);
+  if (existingByRequested && canonicalId && existingByRequested.id !== canonicalId) {
+    state.rekeyNode(existingByRequested.id, canonicalId);
+  }
   const aliasSet = new Set(
     [requestedId, endpointAlias].filter((candidate) => candidate && candidate !== canonicalId),
   );
@@ -604,9 +611,16 @@ function renderNodeDetails(node) {
     ['Primary IP', primaryIp ?? 'N/A'],
   ];
 
-  dom.infoBody.innerHTML = entries.map(
-    ([label, value]) => `<dt>${label}</dt><dd>${value ?? 'N/A'}</dd>`,
-  ).join('');
+  const fragment = document.createDocumentFragment();
+  entries.forEach(([label, value]) => {
+    const dt = document.createElement('dt');
+    dt.textContent = label;
+    const dd = document.createElement('dd');
+    dd.textContent = value ?? 'N/A';
+    fragment.appendChild(dt);
+    fragment.appendChild(dd);
+  });
+  dom.infoBody.replaceChildren(fragment);
 }
 
 function renderGraphStats(graphData) {
@@ -645,14 +659,18 @@ function renderGraphStats(graphData) {
       lines.push({ text: `${label}: ${linkTypeCounts[type]}`, indent: true });
     });
 
-  dom.graphStats.innerHTML = lines
-    .map((entry) => {
-      const { text, indent } = typeof entry === 'string' ? { text: entry, indent: false } : entry;
-      const classes = ['graph-stats__row'];
-      if (indent) classes.push('graph-stats__row--indented');
-      return `<p class="${classes.join(' ')}">${text}</p>`;
-    })
-    .join('');
+  const fragment = document.createDocumentFragment();
+  lines.forEach((entry) => {
+    const { text, indent } = typeof entry === 'string' ? { text: entry, indent: false } : entry;
+    const row = document.createElement('p');
+    row.classList.add('graph-stats__row');
+    if (indent) {
+      row.classList.add('graph-stats__row--indented');
+    }
+    row.textContent = text;
+    fragment.appendChild(row);
+  });
+  dom.graphStats.replaceChildren(fragment);
 }
 
 function formatLinkTypeLabel(token) {
