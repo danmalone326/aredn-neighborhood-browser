@@ -53,11 +53,14 @@ export class GraphRenderer {
     };
     this.isPanning = false;
     this.panStart = null;
+    this.hoveredGroup = null;
     this.#boundPointerMove = (event) => this.#onPointerMove(event);
     this.#boundPointerUp = (event) => this.#endPan(event);
 
     this.svg.addEventListener('wheel', (event) => this.#handleWheel(event), { passive: false });
     this.svg.addEventListener('pointerdown', (event) => this.#beginPan(event));
+    this.svg.addEventListener('pointerleave', () => this.#clearHover());
+    this.svg.addEventListener('pointercancel', () => this.#clearHover());
 
     window.addEventListener('resize', () => this.#syncViewport());
     this.#syncViewport();
@@ -136,6 +139,7 @@ export class GraphRenderer {
   }
 
   #renderNodes() {
+    this.#clearHover();
     while (this.nodeLayer.firstChild) {
       this.nodeLayer.removeChild(this.nodeLayer.firstChild);
     }
@@ -152,18 +156,21 @@ export class GraphRenderer {
       label.classList.add('node-label');
       label.textContent = node.label;
 
-      circle.addEventListener('click', (event) => {
+      circle.addEventListener('pointerup', (event) => {
+        if (event.button !== 0) return;
         event.stopPropagation();
         this.setActiveNode(node.id);
         this.callbacks.onNodeClick(node);
       });
 
-      group.addEventListener('mouseenter', () => {
-        group.classList.add('node-hover');
-        this.#bringGroupToFront(group);
+      group.addEventListener('pointerenter', () => {
+        this.#setHoveredGroup(group);
       });
-      group.addEventListener('mouseleave', () => {
-        group.classList.remove('node-hover');
+      group.addEventListener('pointerleave', () => {
+        this.#setHoveredGroup(null);
+      });
+      group.addEventListener('pointercancel', () => {
+        this.#setHoveredGroup(null);
       });
 
       group.appendChild(circle);
@@ -353,6 +360,22 @@ export class GraphRenderer {
   #bringGroupToFront(group) {
     if (!group || group.parentNode !== this.nodeLayer) return;
     this.nodeLayer.appendChild(group);
+  }
+
+  #setHoveredGroup(group) {
+    if (this.hoveredGroup === group) return;
+    if (this.hoveredGroup) {
+      this.hoveredGroup.classList.remove('node-hover');
+    }
+    this.hoveredGroup = group ?? null;
+    if (this.hoveredGroup) {
+      this.hoveredGroup.classList.add('node-hover');
+      this.#bringGroupToFront(this.hoveredGroup);
+    }
+  }
+
+  #clearHover() {
+    this.#setHoveredGroup(null);
   }
 
   #circleRadiusFor(_node, isActive) {
